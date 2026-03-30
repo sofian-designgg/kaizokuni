@@ -27,18 +27,22 @@ async function handleSlash(interaction) {
     try {
         if (commandName === 'help') {
             const e = new EmbedBuilder()
-                .setTitle('Kaizokuni — aide')
+                .setTitle('Kaizokuni - panneau mobile')
                 .setColor(0x00d4aa)
                 .setDescription(
-                    'Tout est configurable depuis le téléphone avec les **commandes slash**.\nPréfixe texte : `' +
+                    'Tout est configurable depuis le telephone avec les **commandes slash**.\nPrefixe texte : `' +
                         cfg.prefix +
-                        '`'
+                        '`\n\n**Setup rapide**\n1) `/setwelcomechannel`\n2) `/setwelcomerole`\n3) `/config welcometext`\n4) `/config view`'
                 )
                 .addFields(
                     {
                         name: '⚙️ Config (admin)',
                         value:
-                            '`/setwelcomechannel` · `/setwelcomerole` · `/config …` (prefix, modlog, welcome, **welcomerole**, welcometext, wallpaper…)',
+                            '`/setwelcomechannel` · `/setwelcomerole` · `/config view` · `/config prefix` · `/config modlog` · `/config welcome` · `/config welcometext` · `/config welcomerole` · `/config wallpaper` · `/config wallpaperdelay` · `/config wallpaperlimit`',
+                    },
+                    {
+                        name: '🧩 Variables bienvenue',
+                        value: '`{user}` `{mention}` `{username}` `{displayname}` `{server}` `{count}`',
                     },
                     {
                         name: '🛡️ Modération',

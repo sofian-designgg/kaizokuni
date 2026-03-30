@@ -40,31 +40,38 @@ async function handleMessage(message) {
     try {
         if (cmd === 'help') {
             const e = new EmbedBuilder()
-                .setTitle('Kaizokuni — aide (texte)')
+                .setTitle('Kaizokuni - panneau de configuration')
                 .setColor(0x00d4aa)
-                .setDescription(`Préfixe actuel : \`${p}\`\nSur mobile, privilégie aussi les **slash commands** (\`/help\`).`)
+                .setDescription(
+                    `Prefixe actuel : \`${p}\`\n**Setup rapide (telephone)**\n1) \`${p}setwelcomechannel #salon\`\n2) \`${p}setwelcomerole @role\` (ou \`off\`)\n3) \`${p}config welcometext Bienvenue {user} sur {server}\`\n4) \`${p}config view\``
+                )
                 .addFields(
                     {
+                        name: 'Variables bienvenue',
+                        value: '`{user}` `{mention}` `{username}` `{displayname}` `{server}` `{count}`',
+                    },
+                    {
                         name: 'Bienvenue (admin)',
-                        value: `\`${p}setwelcomechannel #salon\` · \`${p}setwelcomerole @role\` (ou \`off\`) · \`${p}config welcometext ...\``,
+                        value: `\`${p}setwelcomechannel #salon\` (alias: \`${p}setwelcomechaannel\`) · \`${p}setwelcomerole @role\` · \`${p}setwelcomerole off\``,
                     },
                     {
                         name: 'Config (admin)',
-                        value: `\`${p}config view\` · \`${p}config prefix\` · \`${p}config modlog\` · \`${p}config welcome\` · \`${p}config welcomerole\` · \`${p}config wallpaper\` · …`,
+                        value: `\`${p}config view\` · \`${p}config prefix <x>\` · \`${p}config modlog #salon\` · \`${p}config welcome #salon\` · \`${p}config welcometext <texte>\` · \`${p}config welcomerole @role|off\` · \`${p}config wallpaper #salon\` · \`${p}config wallpaperdelay <1-60>\` · \`${p}config wallpaperlimit <1-40>\``,
                     },
                     {
-                        name: 'Modération',
-                        value: `\`${p}ban @user [raison]\` · \`${p}kick\` · \`${p}timeout @user minutes [raison]\` · \`${p}untimeout\` · \`${p}clear n\` · \`${p}warn\` · \`${p}warnings\` · \`${p}clearwarns\``,
+                        name: 'Moderation',
+                        value: `\`${p}ban @user [raison]\` · \`${p}kick @user [raison]\` · \`${p}timeout @user <minutes> [raison]\` · \`${p}untimeout @user\` · \`${p}clear <1-100>\` · \`${p}warn @user [raison]\` · \`${p}warnings @user\` · \`${p}clearwarns @user\``,
                     },
                     {
                         name: 'Contenu',
-                        value: `\`${p}embed titre | desc | couleur | footer\` · \`${p}poll Q | A | B\` · \`${p}say texte\``,
+                        value: `\`${p}embed titre | description | couleur | footer\` · \`${p}poll Question | A | B [| C] [| D]\` · \`${p}say texte\``,
                     },
                     {
                         name: 'Wallpapers',
-                        value: `\`${p}wallpaper <url>\` · \`${p}wallpaper stop\``,
+                        value: `\`${p}wallpaper <url>\` · \`${p}wallpaper stop\` (conseille: definir \`${p}config wallpaper #salon\`)`,
                     }
-                );
+                )
+                .setFooter({ text: 'Astuce: /help et /config sont plus simples sur mobile.' });
             return message.reply({ embeds: [e], allowedMentions: { repliedUser: false } });
         }
 
