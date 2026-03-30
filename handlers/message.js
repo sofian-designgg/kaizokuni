@@ -4,6 +4,8 @@ const { getOrCreateGuildConfig } = require('../lib/db');
 const { sendModLog, baseModEmbed } = require('../lib/modLog');
 const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
+const { parseChannelIdLoose } = require('../lib/discordLinkParse');
+const { mirrorChannel, resolveSourceChannelFromLink } = require('../lib/channelMirror');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -91,6 +93,54 @@ async function handleMessage(message) {
                 )
                 .setColor(0x5865f2);
             return message.reply({ embeds: [e], allowedMentions: { repliedUser: false } });
+        }
+
+        if (cmd === 'mirror') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return message.reply('Réservé aux administrateurs.');
+            }
+            // Usage:
+            // +mirror <lien_salon_source|#salon|id> <#salon_cible|id> [limit]
+            const sourceArg = args[0];
+            const targetArg = args[1];
+            const limit = parseInt(args[2] || '50', 10);
+            if (!sourceArg || !targetArg) {
+                return message.reply(`Usage : \`${p}mirror <lien/#source> <#cible> [1-100]\``);
+            }
+
+            const targetId =
+                parseChannelIdLoose(targetArg) || message.mentions.channels.at(0)?.id;
+            const targetCh = targetId ? guild.channels.cache.get(targetId) : null;
+            if (!targetCh?.isTextBased()) {
+                return message.reply('Salon cible invalide.');
+            }
+
+            // Résout la source via lien discord.com/channels/... ou mention/id
+            let sourceCh = null;
+            const srcId = parseChannelIdLoose(sourceArg);
+            if (srcId) {
+                sourceCh = guild.channels.cache.get(srcId) || (await message.client.channels.fetch(srcId).catch(() => null));
+            } else {
+                sourceCh = await resolveSourceChannelFromLink(message.client, sourceArg);
+            }
+
+            if (!sourceCh?.isTextBased()) {
+                return message.reply('Salon source invalide (ou bot sans accès).');
+            }
+
+            await message.reply(
+                `Mirror en cours : ${sourceCh} → ${targetCh} (limit ${Math.min(100, Math.max(1, limit || 50))}).`
+            );
+
+            mirrorChannel({
+                client: message.client,
+                sourceChannel: sourceCh,
+                targetChannel: targetCh,
+                limit: Math.min(100, Math.max(1, limit || 50)),
+                includeAttachments: true,
+                statusChannel: message.channel,
+            }).catch((e) => console.error('mirror', e));
+            return;
         }
 
         if (cmd === 'config') {

@@ -8,6 +8,7 @@ const { getOrCreateGuildConfig } = require('../lib/db');
 const { sendModLog, baseModEmbed } = require('../lib/modLog');
 const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
+const { mirrorChannel } = require('../lib/channelMirror');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -89,6 +90,37 @@ async function handleSlash(interaction) {
                 )
                 .setColor(0x5865f2);
             return interaction.reply({ embeds: [e], ephemeral: true });
+        }
+
+        if (commandName === 'mirror') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const source = interaction.options.getChannel('source', true);
+            const cible = interaction.options.getChannel('cible', true);
+            const limit = interaction.options.getInteger('limit') ?? 50;
+            const pj = interaction.options.getBoolean('pieces_jointes');
+
+            if (!source?.isTextBased() || !cible?.isTextBased()) {
+                return interaction.reply({ content: 'Choisis des salons texte.', ephemeral: true });
+            }
+            if (source.isDMBased() || cible.isDMBased()) {
+                return interaction.reply({ content: 'Salons DM non supportés.', ephemeral: true });
+            }
+
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply({ content: `Mirror en cours : ${source} → ${cible}…` });
+
+            mirrorChannel({
+                client: interaction.client,
+                sourceChannel: source,
+                targetChannel: cible,
+                limit,
+                includeAttachments: pj === null ? true : pj,
+                statusChannel: interaction.channel,
+            }).catch((e) => console.error('mirror', e));
+
+            return;
         }
 
         if (commandName === 'setwelcomechannel') {
