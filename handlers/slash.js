@@ -9,7 +9,8 @@ const { sendModLog, baseModEmbed } = require('../lib/modLog');
 const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { mirrorChannel } = require('../lib/channelMirror');
-const { importFromJsonAttachment } = require('../lib/jsonImport');
+const { runJsonImport } = require('../lib/jsonImportJob');
+const axios = require('axios');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -52,7 +53,7 @@ async function handleSlash(interaction) {
                     },
                     {
                         name: '📣 Contenu',
-                        value: '`/embed` `/poll` `/say`',
+                        value: '`/embed` `/poll` `/say` `/importjson`',
                     },
                     {
                         name: '🖼️ Wallpapers',
@@ -121,42 +122,6 @@ async function handleSlash(interaction) {
                 statusChannel: interaction.channel,
             }).catch((e) => console.error('mirror', e));
 
-            return;
-        }
-
-        if (commandName === 'importjson') {
-            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
-            }
-            const file = interaction.options.getAttachment('fichier', true);
-            const cible = interaction.options.getChannel('cible', true);
-            const limit = interaction.options.getInteger('limit') ?? 200;
-            const pj = interaction.options.getBoolean('pieces_jointes');
-
-            if (!cible?.isTextBased() || cible.isDMBased()) {
-                return interaction.reply({ content: 'Salon cible invalide.', ephemeral: true });
-            }
-            if (!String(file.name || '').toLowerCase().endsWith('.json')) {
-                return interaction.reply({ content: 'Le fichier doit être un `.json`.', ephemeral: true });
-            }
-
-            await interaction.deferReply({ ephemeral: true });
-            await interaction.editReply({
-                content: `Import JSON démarré vers ${cible} (max ${Math.min(500, Math.max(1, limit))}).`,
-            });
-
-            importFromJsonAttachment({
-                attachmentUrl: file.url,
-                targetChannel: cible,
-                statusChannel: interaction.channel,
-                limit: Math.min(500, Math.max(1, limit)),
-                includeAttachments: pj === null ? true : pj,
-            }).catch((e) => {
-                console.error('importjson', e);
-                if (interaction.channel?.isTextBased()) {
-                    interaction.channel.send(`❌ Import JSON échoué: ${e.message || 'erreur inconnue'}`).catch(() => {});
-                }
-            });
             return;
         }
 
@@ -534,6 +499,52 @@ async function handleSlash(interaction) {
             }
             await targetCh.send({ content: text });
             return interaction.reply({ content: 'Envoyé.', ephemeral: true });
+        }
+
+        if (commandName === 'importjson') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+
+            const file = interaction.options.getAttachment('fichier', true);
+            const targetCh = interaction.options.getChannel('cible', true);
+            const delayMs = interaction.options.getInteger('delai_ms') ?? 1200;
+            const max = interaction.options.getInteger('max') ?? 200;
+
+            if (!targetCh?.isTextBased() || targetCh.isDMBased()) {
+                return interaction.reply({ content: 'Salon cible invalide.', ephemeral: true });
+            }
+
+            if (!/\.json$/i.test(file.name || '') && !(file.contentType || '').includes('json')) {
+                return interaction.reply({ content: 'Merci de fournir un fichier JSON.', ephemeral: true });
+            }
+
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply({
+                content: `Import JSON lancé vers ${targetCh} (délai ${delayMs}ms, max ${max}).`,
+            });
+
+            try {
+                const { data } = await axios.get(file.url, {
+                    responseType: 'text',
+                    timeout: 60000,
+                    validateStatus: (s) => s >= 200 && s < 400,
+                });
+
+                await runJsonImport({
+                    jsonText: String(data),
+                    targetChannel: targetCh,
+                    statusChannel: interaction.channel?.isTextBased() ? interaction.channel : targetCh,
+                    delayMs,
+                    maxItems: max,
+                });
+            } catch (e) {
+                console.error('importjson', e);
+                await (interaction.channel?.isTextBased()
+                    ? interaction.channel.send('❌ Import JSON échoué (fichier invalide ou inaccessible).')
+                    : Promise.resolve());
+            }
+            return;
         }
 
         if (commandName === 'wallpaper') {
