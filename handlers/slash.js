@@ -508,7 +508,7 @@ async function handleSlash(interaction) {
 
             const file = interaction.options.getAttachment('fichier', true);
             const targetCh = interaction.options.getChannel('cible', true);
-            const delayMs = interaction.options.getInteger('delai_ms') ?? 1200;
+            const delayMs = Math.max(60_000, interaction.options.getInteger('delai_ms') ?? 60_000);
             const max = interaction.options.getInteger('max') ?? 200;
 
             if (!targetCh?.isTextBased() || targetCh.isDMBased()) {
@@ -521,7 +521,7 @@ async function handleSlash(interaction) {
 
             await interaction.deferReply({ ephemeral: true });
             await interaction.editReply({
-                content: `Import JSON lancé vers ${targetCh} (délai ${delayMs}ms, max ${max}).`,
+                content: `Import JSON lancé vers ${targetCh} (délai ${delayMs}ms minimum, max ${max}).`,
             });
 
             try {
