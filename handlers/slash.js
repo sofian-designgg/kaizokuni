@@ -9,6 +9,7 @@ const { sendModLog, baseModEmbed } = require('../lib/modLog');
 const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { mirrorChannel } = require('../lib/channelMirror');
+const { importFromJsonAttachment } = require('../lib/jsonImport');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -120,6 +121,42 @@ async function handleSlash(interaction) {
                 statusChannel: interaction.channel,
             }).catch((e) => console.error('mirror', e));
 
+            return;
+        }
+
+        if (commandName === 'importjson') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const file = interaction.options.getAttachment('fichier', true);
+            const cible = interaction.options.getChannel('cible', true);
+            const limit = interaction.options.getInteger('limit') ?? 200;
+            const pj = interaction.options.getBoolean('pieces_jointes');
+
+            if (!cible?.isTextBased() || cible.isDMBased()) {
+                return interaction.reply({ content: 'Salon cible invalide.', ephemeral: true });
+            }
+            if (!String(file.name || '').toLowerCase().endsWith('.json')) {
+                return interaction.reply({ content: 'Le fichier doit être un `.json`.', ephemeral: true });
+            }
+
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply({
+                content: `Import JSON démarré vers ${cible} (max ${Math.min(500, Math.max(1, limit))}).`,
+            });
+
+            importFromJsonAttachment({
+                attachmentUrl: file.url,
+                targetChannel: cible,
+                statusChannel: interaction.channel,
+                limit: Math.min(500, Math.max(1, limit)),
+                includeAttachments: pj === null ? true : pj,
+            }).catch((e) => {
+                console.error('importjson', e);
+                if (interaction.channel?.isTextBased()) {
+                    interaction.channel.send(`❌ Import JSON échoué: ${e.message || 'erreur inconnue'}`).catch(() => {});
+                }
+            });
             return;
         }
 

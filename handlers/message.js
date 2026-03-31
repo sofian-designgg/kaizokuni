@@ -6,6 +6,7 @@ const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { parseChannelIdLoose } = require('../lib/discordLinkParse');
 const { mirrorChannel, resolveSourceChannelFromLink } = require('../lib/channelMirror');
+const { importFromJsonAttachment } = require('../lib/jsonImport');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -140,6 +141,50 @@ async function handleMessage(message) {
                 includeAttachments: true,
                 statusChannel: message.channel,
             }).catch((e) => console.error('mirror', e));
+            return;
+        }
+
+        if (cmd === 'importjson') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return message.reply('Réservé aux administrateurs.');
+            }
+            // Usage: +importjson <#cible|id> [limit]
+            // Fichier .json à joindre au message
+            const targetArg = args[0];
+            const limit = parseInt(args[1] || '200', 10);
+            const file = message.attachments.first();
+
+            if (!targetArg) {
+                return message.reply(`Usage : \`${p}importjson <#cible> [1-500]\` + joindre le fichier .json`);
+            }
+            if (!file) {
+                return message.reply('Ajoute un fichier `.json` en pièce jointe du message de commande.');
+            }
+            if (!String(file.name || '').toLowerCase().endsWith('.json')) {
+                return message.reply('Le fichier joint doit être un `.json`.');
+            }
+
+            const targetId =
+                parseChannelIdLoose(targetArg) || message.mentions.channels.first()?.id;
+            const targetCh = targetId ? guild.channels.cache.get(targetId) : null;
+            if (!targetCh?.isTextBased()) {
+                return message.reply('Salon cible invalide.');
+            }
+
+            await message.reply(
+                `Import JSON en cours vers ${targetCh} (max ${Math.min(500, Math.max(1, limit || 200))}).`
+            );
+
+            importFromJsonAttachment({
+                attachmentUrl: file.url,
+                targetChannel: targetCh,
+                statusChannel: message.channel,
+                limit: Math.min(500, Math.max(1, limit || 200)),
+                includeAttachments: true,
+            }).catch((e) => {
+                console.error('importjson', e);
+                message.channel.send(`❌ Import JSON échoué: ${e.message || 'erreur inconnue'}`).catch(() => {});
+            });
             return;
         }
 
