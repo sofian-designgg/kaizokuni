@@ -52,6 +52,12 @@ const guildConfigSchema = new Schema(
             default:
                 'Merci {mention} ! Envoie **une capture** de ton paiement PayPal (reçu / historique) dans {proof_channel}.\nUn staff vérifiera et t’attribuera le VIP.',
         },
+
+        /** Réponse auto si un mot déclencheur apparaît dans un message */
+        autmsgEnabled: { type: Boolean, default: false },
+        autmsgResponse: { type: String, default: '' },
+        autmsgWords: { type: [String], default: [] },
+        autmsgCooldownSec: { type: Number, default: 45 },
     },
     { timestamps: true }
 );

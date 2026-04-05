@@ -17,6 +17,7 @@ const { handlePaypalButton } = require('./handlers/paypalButton');
 const { handleMessage } = require('./handlers/message');
 const { buildWelcomeEmbed } = require('./lib/welcomeEmbed');
 const { handleVipProofMessage, startVipSweep } = require('./lib/vipProof');
+const { handleAutmsg } = require('./lib/autmsg');
 
 startHealthServer();
 
@@ -80,6 +81,7 @@ client.on('interactionCreate', (interaction) => {
 
 client.on('messageCreate', async (m) => {
     await handleVipProofMessage(m);
+    await handleAutmsg(m);
     await handleMessage(m);
 });
 

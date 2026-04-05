@@ -11,6 +11,7 @@ const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { mirrorChannel } = require('../lib/channelMirror');
 const { runJsonImport } = require('../lib/jsonImportJob');
 const { buildPaypalFicheEmbed, buildPaypalButtonRow } = require('../lib/paypalUi');
+const { normalizeWord, MAX_WORDS } = require('../lib/autmsg');
 const axios = require('axios');
 
 function parseHexColor(raw) {
@@ -63,6 +64,10 @@ async function handleSlash(interaction) {
                     {
                         name: '💳 PayPal VIP',
                         value: '`/paypal` · `/setpaypal` (`email`, `prix`, `salon_preuve`, …) · `/setpaypalemail` · `/setpaypalprix`',
+                    },
+                    {
+                        name: '💬 Auto-message',
+                        value: '`/autmsg` (`message`, `ajouter`, `retirer`, `liste`, `cooldown`, …)',
                     },
                     {
                         name: '🖼️ Wallpapers',
@@ -457,6 +462,110 @@ async function handleSlash(interaction) {
             cfg.paypalPrice = interaction.options.getString('montant', true).trim().slice(0, 120);
             await cfg.save();
             return interaction.reply({ content: `Prix affiché : **${cfg.paypalPrice}**`, ephemeral: true });
+        }
+
+        if (commandName === 'autmsg') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const sub = interaction.options.getSubcommand();
+            const words = Array.isArray(cfg.autmsgWords) ? [...cfg.autmsgWords] : [];
+
+            if (sub === 'view') {
+                const e = new EmbedBuilder()
+                    .setTitle('Auto-message (/autmsg)')
+                    .setColor(0x9b59b6)
+                    .addFields(
+                        { name: 'Actif', value: cfg.autmsgEnabled ? 'Oui' : 'Non', inline: true },
+                        {
+                            name: 'Cooldown',
+                            value: `${cfg.autmsgCooldownSec ?? 45} s / membre`,
+                            inline: true,
+                        },
+                        {
+                            name: 'Mots',
+                            value: words.length ? words.map((w) => `\`${w}\``).join(', ').slice(0, 900) : '—',
+                        },
+                        { name: 'Message', value: (cfg.autmsgResponse || '—').slice(0, 900) }
+                    );
+                return interaction.reply({ embeds: [e], ephemeral: true });
+            }
+
+            if (sub === 'on') {
+                cfg.autmsgEnabled = true;
+                await cfg.save();
+                return interaction.reply({ content: 'Auto-message **activé**.', ephemeral: true });
+            }
+
+            if (sub === 'off') {
+                cfg.autmsgEnabled = false;
+                await cfg.save();
+                return interaction.reply({ content: 'Auto-message **désactivé**.', ephemeral: true });
+            }
+
+            if (sub === 'message') {
+                cfg.autmsgResponse = interaction.options.getString('texte', true).slice(0, 2000);
+                await cfg.save();
+                return interaction.reply({ content: 'Message enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'ajouter') {
+                const raw = interaction.options.getString('mot', true);
+                const w = normalizeWord(raw);
+                if (!w) {
+                    return interaction.reply({ content: 'Mot invalide.', ephemeral: true });
+                }
+                if (words.includes(w)) {
+                    return interaction.reply({ content: `Le mot \`${w}\` est déjà dans la liste.`, ephemeral: true });
+                }
+                if (words.length >= MAX_WORDS) {
+                    return interaction.reply({
+                        content: `Limite **${MAX_WORDS}** mots. Retire-en avec \`/autmsg retirer\` ou \`/autmsg vider\`.`,
+                        ephemeral: true,
+                    });
+                }
+                words.push(w);
+                cfg.autmsgWords = words;
+                await cfg.save();
+                return interaction.reply({ content: `Mot ajouté : \`${w}\` (${words.length}/${MAX_WORDS})`, ephemeral: true });
+            }
+
+            if (sub === 'retirer') {
+                const w = normalizeWord(interaction.options.getString('mot', true));
+                const idx = words.indexOf(w);
+                if (idx === -1) {
+                    return interaction.reply({ content: `Mot \`${w}\` introuvable.`, ephemeral: true });
+                }
+                words.splice(idx, 1);
+                cfg.autmsgWords = words;
+                await cfg.save();
+                return interaction.reply({ content: `Mot retiré : \`${w}\``, ephemeral: true });
+            }
+
+            if (sub === 'liste') {
+                if (!words.length) {
+                    return interaction.reply({ content: 'Aucun mot. Utilise `/autmsg ajouter`.', ephemeral: true });
+                }
+                return interaction.reply({
+                    content: `**${words.length}** mot(s) : ${words.map((x) => `\`${x}\``).join(', ')}`.slice(0, 2000),
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'vider') {
+                cfg.autmsgWords = [];
+                await cfg.save();
+                return interaction.reply({ content: 'Liste des mots **vidée**.', ephemeral: true });
+            }
+
+            if (sub === 'cooldown') {
+                cfg.autmsgCooldownSec = interaction.options.getInteger('secondes', true);
+                await cfg.save();
+                return interaction.reply({
+                    content: `Cooldown : **${cfg.autmsgCooldownSec}** s par membre.`,
+                    ephemeral: true,
+                });
+            }
         }
 
         if (commandName === 'config') {
