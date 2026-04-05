@@ -13,6 +13,7 @@ const { resolveApplicationId } = require('./lib/resolveApplicationId');
 const { startHealthServer } = require('./lib/httpServer');
 const { buildSlashCommands } = require('./lib/slashCommands');
 const { handleSlash } = require('./handlers/slash');
+const { handlePaypalButton } = require('./handlers/paypalButton');
 const { handleMessage } = require('./handlers/message');
 const { buildWelcomeEmbed } = require('./lib/welcomeEmbed');
 const { handleVipProofMessage, startVipSweep } = require('./lib/vipProof');
@@ -74,6 +75,7 @@ client.once('clientReady', async () => {
 
 client.on('interactionCreate', (interaction) => {
     if (interaction.isChatInputCommand()) return handleSlash(interaction);
+    if (interaction.isButton()) return handlePaypalButton(interaction);
 });
 
 client.on('messageCreate', async (m) => {

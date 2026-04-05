@@ -10,6 +10,7 @@ const wallQueue = require('../lib/wallQueue');
 const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { mirrorChannel } = require('../lib/channelMirror');
 const { runJsonImport } = require('../lib/jsonImportJob');
+const { buildPaypalFicheEmbed, buildPaypalButtonRow } = require('../lib/paypalUi');
 const axios = require('axios');
 
 function parseHexColor(raw) {
@@ -58,6 +59,10 @@ async function handleSlash(interaction) {
                     {
                         name: '⭐ VIP preuve',
                         value: '`/setautorole` (salon PJ, rôle, message, durée, min/max) — réponse embed automatique',
+                    },
+                    {
+                        name: '💳 PayPal VIP',
+                        value: '`/paypal` · `/setpaypal` (`email`, `prix`, `salon_preuve`, …) · `/setpaypalemail` · `/setpaypalprix`',
                     },
                     {
                         name: '🖼️ Wallpapers',
@@ -312,6 +317,146 @@ async function handleSlash(interaction) {
                 await cfg.save();
                 return interaction.reply({ content: `Maximum PJ : **${n}**.`, ephemeral: true });
             }
+        }
+
+        if (commandName === 'paypal') {
+            if (!cfg.paypalEnabled) {
+                return interaction.reply({
+                    content: 'Paiement PayPal non activé. Un admin doit faire `/setpaypal on` après configuration.',
+                    ephemeral: true,
+                });
+            }
+            if (!cfg.paypalEmail || !cfg.paypalPrice) {
+                return interaction.reply({
+                    content:
+                        'Fiche incomplète : il manque **email** ou **prix**. Demande à un admin de faire `/setpaypal email` et `/setpaypal prix`.',
+                    ephemeral: true,
+                });
+            }
+            const embed = buildPaypalFicheEmbed(cfg, guild);
+            const row = buildPaypalButtonRow(cfg, guild.id);
+            return interaction.reply({ embeds: [embed], components: [row] });
+        }
+
+        if (commandName === 'setpaypal') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const sub = interaction.options.getSubcommand();
+
+            if (sub === 'view') {
+                const e = new EmbedBuilder()
+                    .setTitle('PayPal — configuration')
+                    .setColor(0x003087)
+                    .addFields(
+                        { name: 'Actif', value: cfg.paypalEnabled ? 'Oui' : 'Non', inline: true },
+                        { name: 'Email', value: cfg.paypalEmail || '—', inline: true },
+                        { name: 'Prix', value: cfg.paypalPrice || '—', inline: true },
+                        {
+                            name: 'Salon preuve',
+                            value: cfg.paypalProofChannelId ? `<#${cfg.paypalProofChannelId}>` : '—',
+                            inline: true,
+                        },
+                        { name: 'Lien', value: cfg.paypalMeLink || '—', inline: true },
+                        { name: 'Bouton', value: cfg.paypalButtonLabel || '—', inline: true },
+                        { name: 'Titre fiche', value: (cfg.paypalEmbedTitle || '—').slice(0, 256) },
+                        { name: 'Notes fiche', value: (cfg.paypalNotes || '—').slice(0, 900) },
+                        {
+                            name: 'Message après bouton',
+                            value: (cfg.paypalAfterPayMessage || '—').slice(0, 900),
+                        }
+                    );
+                return interaction.reply({ embeds: [e], ephemeral: true });
+            }
+
+            if (sub === 'on') {
+                cfg.paypalEnabled = true;
+                await cfg.save();
+                return interaction.reply({ content: 'PayPal **activé**.', ephemeral: true });
+            }
+
+            if (sub === 'off') {
+                cfg.paypalEnabled = false;
+                await cfg.save();
+                return interaction.reply({ content: 'PayPal **désactivé**.', ephemeral: true });
+            }
+
+            if (sub === 'email') {
+                cfg.paypalEmail = interaction.options.getString('adresse', true).trim().slice(0, 320);
+                await cfg.save();
+                return interaction.reply({ content: `Email PayPal : **${cfg.paypalEmail}**`, ephemeral: true });
+            }
+
+            if (sub === 'prix') {
+                cfg.paypalPrice = interaction.options.getString('montant', true).trim().slice(0, 120);
+                await cfg.save();
+                return interaction.reply({ content: `Prix affiché : **${cfg.paypalPrice}**`, ephemeral: true });
+            }
+
+            if (sub === 'salon_preuve') {
+                const ch = interaction.options.getChannel('channel', true);
+                if (ch.type !== ChannelType.GuildText && ch.type !== ChannelType.GuildAnnouncement) {
+                    return interaction.reply({ content: 'Choisis un salon texte.', ephemeral: true });
+                }
+                cfg.paypalProofChannelId = ch.id;
+                await cfg.save();
+                return interaction.reply({ content: `Salon preuve : ${ch}`, ephemeral: true });
+            }
+
+            if (sub === 'apres_paiement') {
+                cfg.paypalAfterPayMessage = interaction.options.getString('texte', true).slice(0, 2000);
+                await cfg.save();
+                return interaction.reply({ content: 'Message après clic enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'titre') {
+                cfg.paypalEmbedTitle = interaction.options.getString('texte', true).slice(0, 256);
+                await cfg.save();
+                return interaction.reply({ content: 'Titre fiche enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'notes') {
+                cfg.paypalNotes = interaction.options.getString('texte', true).slice(0, 1500);
+                await cfg.save();
+                return interaction.reply({ content: 'Notes enregistrées.', ephemeral: true });
+            }
+
+            if (sub === 'bouton') {
+                cfg.paypalButtonLabel = interaction.options.getString('texte', true).slice(0, 80);
+                await cfg.save();
+                return interaction.reply({ content: `Libellé bouton : **${cfg.paypalButtonLabel}**`, ephemeral: true });
+            }
+
+            if (sub === 'lien') {
+                cfg.paypalMeLink = interaction.options.getString('url', true).trim().slice(0, 500);
+                await cfg.save();
+                return interaction.reply({ content: 'Lien enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'couleur') {
+                const hex = interaction.options.getString('hex', true);
+                cfg.paypalEmbedColor = parseHexColor(hex);
+                await cfg.save();
+                return interaction.reply({ content: `Couleur fiche : **#${hex.replace(/^#/, '')}**`, ephemeral: true });
+            }
+        }
+
+        if (commandName === 'setpaypalemail') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            cfg.paypalEmail = interaction.options.getString('email', true).trim().slice(0, 320);
+            await cfg.save();
+            return interaction.reply({ content: `Email PayPal : **${cfg.paypalEmail}**`, ephemeral: true });
+        }
+
+        if (commandName === 'setpaypalprix') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            cfg.paypalPrice = interaction.options.getString('montant', true).trim().slice(0, 120);
+            await cfg.save();
+            return interaction.reply({ content: `Prix affiché : **${cfg.paypalPrice}**`, ephemeral: true });
         }
 
         if (commandName === 'config') {

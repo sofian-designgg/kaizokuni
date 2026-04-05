@@ -36,6 +36,22 @@ const guildConfigSchema = new Schema(
         vipProofDurationDays: { type: Number, default: 7 },
         vipProofMinAttachments: { type: Number, default: 3 },
         vipProofMaxAttachments: { type: Number, default: 10 },
+
+        /** Fiche PayPal + bouton “j’ai payé” */
+        paypalEnabled: { type: Boolean, default: false },
+        paypalEmail: { type: String, default: null },
+        paypalPrice: { type: String, default: null },
+        paypalMeLink: { type: String, default: null },
+        paypalNotes: { type: String, default: null },
+        paypalEmbedTitle: { type: String, default: 'Paiement VIP — PayPal' },
+        paypalEmbedColor: { type: Number, default: 0x003087 },
+        paypalProofChannelId: { type: String, default: null },
+        paypalButtonLabel: { type: String, default: 'J’ai envoyé le paiement' },
+        paypalAfterPayMessage: {
+            type: String,
+            default:
+                'Merci {mention} ! Envoie **une capture** de ton paiement PayPal (reçu / historique) dans {proof_channel}.\nUn staff vérifiera et t’attribuera le VIP.',
+        },
     },
     { timestamps: true }
 );
