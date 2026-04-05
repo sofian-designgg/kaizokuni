@@ -16,6 +16,7 @@ const { handleSlash } = require('./handlers/slash');
 const { handlePaypalButton } = require('./handlers/paypalButton');
 const { handleMessage } = require('./handlers/message');
 const { buildWelcomeEmbed } = require('./lib/welcomeEmbed');
+const { buildJoinDmEmbed } = require('./lib/joinDmEmbed');
 const { handleVipProofMessage, startVipSweep } = require('./lib/vipProof');
 const { handleAutmsg } = require('./lib/autmsg');
 
@@ -98,6 +99,15 @@ client.on('guildMemberAdd', async (member) => {
                 me.roles.highest.position > role.position
             ) {
                 await member.roles.add(role, 'Kaizokuni — rôle de bienvenue').catch(() => {});
+            }
+        }
+
+        if (cfg.joinDmEnabled) {
+            try {
+                const dmEmbed = buildJoinDmEmbed(member, cfg);
+                await member.send({ embeds: [dmEmbed] });
+            } catch {
+                /* MP fermés ou utilisateur introuvable */
             }
         }
 

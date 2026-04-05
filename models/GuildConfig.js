@@ -13,6 +13,13 @@ const guildConfigSchema = new Schema(
         },
         /** Rôle attribué automatiquement à l’arrivée (bot doit être au-dessus + permission Rôles) */
         welcomeRoleId: { type: String, default: null },
+
+        /** MP à l’arrivée (embed) — expliquer que le VIP n’est pas obligatoire, etc. */
+        joinDmEnabled: { type: Boolean, default: false },
+        joinDmTitle: { type: String, default: 'ℹ️ Infos importantes — {server}' },
+        joinDmDescription: { type: String, default: '' },
+        joinDmColor: { type: Number, default: 0x3498db },
+        joinDmFooter: { type: String, default: '' },
         wallpaperChannelId: { type: String, default: null },
         wallpaperDelayMs: { type: Number, default: 2500 },
         wallpaperMaxBatch: { type: Number, default: 15 },

@@ -11,6 +11,7 @@ const { runWallpaperJob } = require('../lib/wallpaperJob');
 const { mirrorChannel } = require('../lib/channelMirror');
 const { runJsonImport } = require('../lib/jsonImportJob');
 const { buildPaypalFicheEmbed, buildPaypalButtonRow } = require('../lib/paypalUi');
+const { buildJoinDmEmbed, DEFAULT_JOIN_DM_DESC } = require('../lib/joinDmEmbed');
 const { normalizeWord, MAX_WORDS } = require('../lib/autmsg');
 const axios = require('axios');
 
@@ -43,7 +44,7 @@ async function handleSlash(interaction) {
                     {
                         name: '⚙️ Config (admin)',
                         value:
-                            '`/setwelcomechannel` · `/setwelcomerole` · `/config view` · `/config prefix` · `/config modlog` · `/config welcome` · `/config welcometext` · `/config welcomerole` · `/config wallpaper` · `/config wallpaperdelay` · `/config wallpaperlimit`',
+                            '`/setwelcomechannel` · `/setwelcomerole` · `/messagemp` (MP à l’arrivée) · `/config view` · `/config prefix` · `/config modlog` · `/config welcome` · `/config welcometext` · `/config welcomerole` · `/config wallpaper` · `/config wallpaperdelay` · `/config wallpaperlimit`',
                     },
                     {
                         name: '🧩 Variables bienvenue',
@@ -180,6 +181,113 @@ async function handleSlash(interaction) {
                 content: `Les nouveaux membres recevront : ${role}\n_Vérifie que le bot est **au-dessus** de ce rôle et a la permission **Gérer les rôles**._`,
                 ephemeral: true,
             });
+        }
+
+        if (commandName === 'messagemp') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const sub = interaction.options.getSubcommand();
+
+            if (sub === 'view') {
+                const descPreview = (cfg.joinDmDescription || '').trim()
+                    ? (cfg.joinDmDescription || '').slice(0, 900)
+                    : `(défaut bot)\n${DEFAULT_JOIN_DM_DESC.slice(0, 700)}`;
+                const e = new EmbedBuilder()
+                    .setTitle('MP à l’arrivée — configuration')
+                    .setColor(0x3498db)
+                    .addFields(
+                        { name: 'Actif', value: cfg.joinDmEnabled ? 'Oui' : 'Non', inline: true },
+                        {
+                            name: 'Couleur',
+                            value: `#${(Number(cfg.joinDmColor) || 0x3498db).toString(16).padStart(6, '0')}`,
+                            inline: true,
+                        },
+                        {
+                            name: 'Titre',
+                            value: (cfg.joinDmTitle || '').trim() ? (cfg.joinDmTitle || '').slice(0, 256) : '— (aucun)',
+                        },
+                        { name: 'Description', value: descPreview },
+                        {
+                            name: 'Pied',
+                            value: (cfg.joinDmFooter || '').trim()
+                                ? (cfg.joinDmFooter || '').slice(0, 500)
+                                : '— (nom du serveur)',
+                        }
+                    )
+                    .setFooter({ text: 'Variables : {user} {mention} {username} {displayname} {server} {count}' });
+                return interaction.reply({ embeds: [e], ephemeral: true });
+            }
+
+            if (sub === 'on') {
+                cfg.joinDmEnabled = true;
+                await cfg.save();
+                return interaction.reply({
+                    content:
+                        'MP d’arrivée **activé**. Chaque nouveau membre reçoit l’embed en message privé (s’il a les MP ouverts).',
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'off') {
+                cfg.joinDmEnabled = false;
+                await cfg.save();
+                return interaction.reply({ content: 'MP d’arrivée **désactivé**.', ephemeral: true });
+            }
+
+            if (sub === 'titre') {
+                const raw = interaction.options.getString('texte', true).trim();
+                const lower = raw.toLowerCase();
+                cfg.joinDmTitle =
+                    raw === '' || raw === '-' || lower === 'aucun' ? '' : raw.slice(0, 256);
+                await cfg.save();
+                return interaction.reply({
+                    content: cfg.joinDmTitle
+                        ? 'Titre enregistré.'
+                        : 'Titre retiré : embed sans ligne de titre.',
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'description') {
+                const raw = interaction.options.getString('texte', true);
+                const t = raw.trim();
+                const lower = t.toLowerCase();
+                if (t === '' || t === '-' || lower === 'defaut' || lower === 'défaut') {
+                    cfg.joinDmDescription = '';
+                } else {
+                    cfg.joinDmDescription = raw.slice(0, 4000);
+                }
+                await cfg.save();
+                return interaction.reply({
+                    content:
+                        cfg.joinDmDescription.trim() === ''
+                            ? 'Description réinitialisée : le **texte par défaut** du bot sera utilisé.'
+                            : 'Description enregistrée.',
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'couleur') {
+                const hex = interaction.options.getString('hex', true);
+                cfg.joinDmColor = parseHexColor(hex);
+                await cfg.save();
+                return interaction.reply({ content: `Couleur : **#${hex.replace(/^#/, '')}**`, ephemeral: true });
+            }
+
+            if (sub === 'pied') {
+                const raw = interaction.options.getString('texte', true).trim();
+                const lower = raw.toLowerCase();
+                cfg.joinDmFooter =
+                    raw === '' || raw === '-' || lower === 'aucun' ? '' : raw.slice(0, 2048);
+                await cfg.save();
+                return interaction.reply({
+                    content: cfg.joinDmFooter
+                        ? 'Pied de page enregistré.'
+                        : 'Pied par défaut : **nom du serveur** uniquement.',
+                    ephemeral: true,
+                });
+            }
         }
 
         if (commandName === 'setautorole') {
