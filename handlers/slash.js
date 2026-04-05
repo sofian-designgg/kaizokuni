@@ -59,7 +59,7 @@ async function handleSlash(interaction) {
                     },
                     {
                         name: '⭐ VIP preuve',
-                        value: '`/setautorole` (salon PJ, rôle, message, durée, min/max) — réponse embed automatique',
+                        value: '`/setautorole` (salon PJ, rôle, message, durée, min/max) — réponse en message texte',
                     },
                     {
                         name: '💳 PayPal VIP',
@@ -219,13 +219,16 @@ async function handleSlash(interaction) {
                             inline: true,
                         },
                         {
-                            name: 'Couleur embed',
-                            value: `#${(Number(cfg.vipProofEmbedColor) || 0xf1c40f).toString(16).padStart(6, '0')}`,
+                            name: 'Couleur (réserve)',
+                            value: `#${(Number(cfg.vipProofEmbedColor) || 0xf1c40f).toString(16).padStart(6, '0')} — non utilisée`,
                             inline: true,
                         },
-                        { name: 'Titre embed', value: (cfg.vipProofEmbedTitle || '—').slice(0, 256) },
                         {
-                            name: 'Message (description)',
+                            name: 'Titre optionnel',
+                            value: (cfg.vipProofEmbedTitle || '').trim() ? (cfg.vipProofEmbedTitle || '').slice(0, 256) : '— (aucun)',
+                        },
+                        {
+                            name: 'Corps du message',
                             value: (cfg.vipProofEmbedDescription || '—').slice(0, 900),
                         }
                     );
@@ -274,9 +277,17 @@ async function handleSlash(interaction) {
             }
 
             if (sub === 'titre') {
-                cfg.vipProofEmbedTitle = interaction.options.getString('texte', true).slice(0, 256);
+                const raw = interaction.options.getString('texte', true).trim();
+                const lower = raw.toLowerCase();
+                cfg.vipProofEmbedTitle =
+                    raw === '' || raw === '-' || lower === 'aucun' ? '' : raw.slice(0, 256);
                 await cfg.save();
-                return interaction.reply({ content: 'Titre enregistré.', ephemeral: true });
+                return interaction.reply({
+                    content: cfg.vipProofEmbedTitle
+                        ? 'Titre enregistré (ligne en gras au-dessus du message).'
+                        : 'Titre retiré : seul le corps du message sera envoyé.',
+                    ephemeral: true,
+                });
             }
 
             if (sub === 'couleur') {

@@ -23,9 +23,10 @@ const guildConfigSchema = new Schema(
         vipProofEnabled: { type: Boolean, default: false },
         vipProofChannelId: { type: String, default: null },
         vipProofRoleId: { type: String, default: null },
+        /** Optionnel : première ligne en gras avant le corps (message = texte seul si vide) */
         vipProofEmbedTitle: {
             type: String,
-            default: 'VIP validé',
+            default: '',
         },
         vipProofEmbedDescription: {
             type: String,
