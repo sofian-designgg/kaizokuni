@@ -224,11 +224,7 @@ async function handleSlash(interaction) {
                             inline: true,
                         },
                         {
-                            name: 'Titre optionnel',
-                            value: (cfg.vipProofEmbedTitle || '').trim() ? (cfg.vipProofEmbedTitle || '').slice(0, 256) : '— (aucun)',
-                        },
-                        {
-                            name: 'Corps du message',
+                            name: 'Message',
                             value: (cfg.vipProofEmbedDescription || '—').slice(0, 900),
                         }
                     );
@@ -274,20 +270,6 @@ async function handleSlash(interaction) {
                 cfg.vipProofEmbedDescription = interaction.options.getString('texte', true).slice(0, 2000);
                 await cfg.save();
                 return interaction.reply({ content: 'Message de réponse enregistré.', ephemeral: true });
-            }
-
-            if (sub === 'titre') {
-                const raw = interaction.options.getString('texte', true).trim();
-                const lower = raw.toLowerCase();
-                cfg.vipProofEmbedTitle =
-                    raw === '' || raw === '-' || lower === 'aucun' ? '' : raw.slice(0, 256);
-                await cfg.save();
-                return interaction.reply({
-                    content: cfg.vipProofEmbedTitle
-                        ? 'Titre enregistré (ligne en gras au-dessus du message).'
-                        : 'Titre retiré : seul le corps du message sera envoyé.',
-                    ephemeral: true,
-                });
             }
 
             if (sub === 'couleur') {
