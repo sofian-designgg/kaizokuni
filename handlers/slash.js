@@ -14,6 +14,8 @@ const { buildPaypalFicheEmbed, buildPaypalButtonRow } = require('../lib/paypalUi
 const { buildJoinDmEmbed, DEFAULT_JOIN_DM_DESC } = require('../lib/joinDmEmbed');
 const { normalizeWord, MAX_WORDS } = require('../lib/autmsg');
 const axios = require('axios');
+const { runTicketSlash } = require('./ticketSlash');
+const { runProfileSlash } = require('./profileSlash');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -31,6 +33,9 @@ async function handleSlash(interaction) {
     const cfg = await getOrCreateGuildConfig(guild.id);
 
     try {
+        if (await runTicketSlash(interaction)) return;
+        if (await runProfileSlash(interaction, cfg)) return;
+
         if (commandName === 'help') {
             const e = new EmbedBuilder()
                 .setTitle('Kaizokuni - panneau mobile')
@@ -56,7 +61,15 @@ async function handleSlash(interaction) {
                     },
                     {
                         name: '📣 Contenu',
-                        value: '`/embed` `/poll` `/say` `/importjson`',
+                        value: '`/embed envoyer` (titre, champs, image…) · `/poll` `/say` `/importjson`',
+                    },
+                    {
+                        name: '🎫 Tickets',
+                        value: '`/setticket` (view, on, catégorie, staff, panel_*, accueil_*, …) · `/ticketpanel`',
+                    },
+                    {
+                        name: '👤 Profil VIP',
+                        value: '`/setprofil` (rôle acheteur) · `/profil` (voir, bio, couleur) · `/pseudo`',
                     },
                     {
                         name: '⭐ VIP preuve',
@@ -962,13 +975,45 @@ async function handleSlash(interaction) {
         }
 
         if (commandName === 'embed') {
-            const title = interaction.options.getString('titre', true);
+            const sub = interaction.options.getSubcommand();
+            if (sub !== 'envoyer') {
+                return interaction.reply({ content: 'Utilise `/embed envoyer`.', ephemeral: true });
+            }
             const description = interaction.options.getString('description', true);
-            const color = parseHexColor(interaction.options.getString('couleur'));
+            const title = interaction.options.getString('titre');
+            const color = parseHexColor(interaction.options.getString('couleur') || '5865f2');
             const footer = interaction.options.getString('pied');
-            const e = new EmbedBuilder().setTitle(title).setDescription(description).setColor(color);
+            const image = interaction.options.getString('image');
+            const thumb = interaction.options.getString('miniature');
+            const chOpt = interaction.options.getChannel('salon');
+            const targetCh =
+                chOpt &&
+                (chOpt.type === ChannelType.GuildText || chOpt.type === ChannelType.GuildAnnouncement)
+                    ? chOpt
+                    : interaction.channel;
+
+            if (!targetCh?.isTextBased() || targetCh.isDMBased()) {
+                return interaction.reply({ content: 'Salon invalide.', ephemeral: true });
+            }
+
+            const e = new EmbedBuilder().setDescription(description).setColor(color);
+            if (title) e.setTitle(title.slice(0, 256));
             if (footer) e.setFooter({ text: footer.slice(0, 2048) });
-            return interaction.reply({ embeds: [e] });
+            if (image && /^https?:\/\//i.test(image.trim())) e.setImage(image.trim().slice(0, 500));
+            if (thumb && /^https?:\/\//i.test(thumb.trim())) e.setThumbnail(thumb.trim().slice(0, 500));
+
+            const n1 = interaction.options.getString('champ1_nom');
+            const t1 = interaction.options.getString('champ1_texte');
+            const n2 = interaction.options.getString('champ2_nom');
+            const t2 = interaction.options.getString('champ2_texte');
+            if (n1 && t1) e.addFields({ name: n1.slice(0, 256), value: t1.slice(0, 1024) });
+            if (n2 && t2) e.addFields({ name: n2.slice(0, 256), value: t2.slice(0, 1024) });
+
+            if (targetCh.id === interaction.channelId) {
+                return interaction.reply({ embeds: [e] });
+            }
+            await targetCh.send({ embeds: [e] });
+            return interaction.reply({ content: `Embed envoyé dans ${targetCh}.`, ephemeral: true });
         }
 
         if (commandName === 'poll') {

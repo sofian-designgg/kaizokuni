@@ -61,6 +61,33 @@ const guildConfigSchema = new Schema(
         autmsgResponse: { type: String, default: '' },
         autmsgWords: { type: [String], default: [] },
         autmsgCooldownSec: { type: Number, default: 45 },
+
+        /** Profil + pseudo (membres avec le rôle « acheteur / VIP » configuré) */
+        profileEnabled: { type: Boolean, default: false },
+        profileVipRoleId: { type: String, default: null },
+
+        /** Tickets : panel + salons privés */
+        ticketEnabled: { type: Boolean, default: false },
+        ticketCategoryId: { type: String, default: null },
+        ticketStaffRoleId: { type: String, default: null },
+        ticketLogChannelId: { type: String, default: null },
+        ticketMaxOpenPerUser: { type: Number, default: 1 },
+        ticketPanelButtonLabel: { type: String, default: '📩 Ouvrir un ticket' },
+        ticketPanelTitle: { type: String, default: 'Support — ouvre un ticket' },
+        ticketPanelDescription: {
+            type: String,
+            default:
+                'Clique sur le bouton ci-dessous pour contacter le staff. Un salon privé sera créé pour toi.',
+        },
+        ticketPanelColor: { type: Number, default: 0x5865f2 },
+        ticketPanelFooter: { type: String, default: '' },
+        ticketOpenTitle: { type: String, default: '🎫 Ticket — {username}' },
+        ticketOpenDescription: {
+            type: String,
+            default:
+                '{mention} explique ta demande ici. Le staff sera notifié ({staff_role}).',
+        },
+        ticketOpenColor: { type: Number, default: 0x57f287 },
     },
     { timestamps: true }
 );

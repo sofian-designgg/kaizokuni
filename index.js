@@ -14,6 +14,7 @@ const { startHealthServer } = require('./lib/httpServer');
 const { buildSlashCommands } = require('./lib/slashCommands');
 const { handleSlash } = require('./handlers/slash');
 const { handlePaypalButton } = require('./handlers/paypalButton');
+const { runTicketButton } = require('./handlers/ticketSlash');
 const { handleMessage } = require('./handlers/message');
 const { buildWelcomeEmbed } = require('./lib/welcomeEmbed');
 const { buildJoinDmEmbed } = require('./lib/joinDmEmbed');
@@ -75,9 +76,12 @@ client.once('clientReady', async () => {
     }
 });
 
-client.on('interactionCreate', (interaction) => {
+client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) return handleSlash(interaction);
-    if (interaction.isButton()) return handlePaypalButton(interaction);
+    if (interaction.isButton()) {
+        if (interaction.customId.startsWith('kz_paypal_paid:')) return handlePaypalButton(interaction);
+        await runTicketButton(interaction);
+    }
 });
 
 client.on('messageCreate', async (m) => {
