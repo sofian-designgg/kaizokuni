@@ -18,6 +18,24 @@ const guildConfigSchema = new Schema(
         wallpaperMaxBatch: { type: Number, default: 15 },
         wallpaperMaxFileMB: { type: Number, default: 8 },
         muteRoleId: { type: String, default: null },
+
+        /** VIP preuve : message avec N pièces jointes dans un salon → rôle temporaire */
+        vipProofEnabled: { type: Boolean, default: false },
+        vipProofChannelId: { type: String, default: null },
+        vipProofRoleId: { type: String, default: null },
+        vipProofEmbedTitle: {
+            type: String,
+            default: 'VIP validé',
+        },
+        vipProofEmbedDescription: {
+            type: String,
+            default:
+                'Bravo {mention} ! Ta preuve est acceptée.\nTu as le rôle {role} jusqu’au **<t:{expires}:F>** (<t:{expires}:R>).\n**{nb_fichiers}** fichier(s) reçu(s).',
+        },
+        vipProofEmbedColor: { type: Number, default: 0xf1c40f },
+        vipProofDurationDays: { type: Number, default: 7 },
+        vipProofMinAttachments: { type: Number, default: 3 },
+        vipProofMaxAttachments: { type: Number, default: 10 },
     },
     { timestamps: true }
 );

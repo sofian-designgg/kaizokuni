@@ -15,6 +15,7 @@ const { buildSlashCommands } = require('./lib/slashCommands');
 const { handleSlash } = require('./handlers/slash');
 const { handleMessage } = require('./handlers/message');
 const { buildWelcomeEmbed } = require('./lib/welcomeEmbed');
+const { handleVipProofMessage, startVipSweep } = require('./lib/vipProof');
 
 startHealthServer();
 
@@ -39,6 +40,8 @@ client.once('clientReady', async () => {
         console.error('Échec MongoDB :', e.message);
         process.exit(1);
     }
+
+    startVipSweep(client);
 
     const token = process.env.TOKEN;
     const clientId = resolveApplicationId(token, process.env.DISCORD_CLIENT_ID);
@@ -73,7 +76,10 @@ client.on('interactionCreate', (interaction) => {
     if (interaction.isChatInputCommand()) return handleSlash(interaction);
 });
 
-client.on('messageCreate', handleMessage);
+client.on('messageCreate', async (m) => {
+    await handleVipProofMessage(m);
+    await handleMessage(m);
+});
 
 client.on('guildMemberAdd', async (member) => {
     try {

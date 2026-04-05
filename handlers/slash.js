@@ -56,6 +56,10 @@ async function handleSlash(interaction) {
                         value: '`/embed` `/poll` `/say` `/importjson`',
                     },
                     {
+                        name: '⭐ VIP preuve',
+                        value: '`/setautorole` (salon PJ, rôle, message, durée, min/max) — réponse embed automatique',
+                    },
+                    {
                         name: '🖼️ Wallpapers',
                         value: '`/wallpaper queue` (URL page ou direct) · `/wallpaper stop`\nÉquivalent : `' +
                             cfg.prefix +
@@ -166,6 +170,148 @@ async function handleSlash(interaction) {
                 content: `Les nouveaux membres recevront : ${role}\n_Vérifie que le bot est **au-dessus** de ce rôle et a la permission **Gérer les rôles**._`,
                 ephemeral: true,
             });
+        }
+
+        if (commandName === 'setautorole') {
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'Réservé aux administrateurs.', ephemeral: true });
+            }
+            const sub = interaction.options.getSubcommand();
+
+            if (sub === 'view') {
+                const e = new EmbedBuilder()
+                    .setTitle('VIP preuve — configuration')
+                    .setColor(0xf1c40f)
+                    .addFields(
+                        {
+                            name: 'Actif',
+                            value: cfg.vipProofEnabled ? 'Oui' : 'Non',
+                            inline: true,
+                        },
+                        {
+                            name: 'Salon preuve',
+                            value: cfg.vipProofChannelId ? `<#${cfg.vipProofChannelId}>` : '—',
+                            inline: true,
+                        },
+                        {
+                            name: 'Rôle',
+                            value: cfg.vipProofRoleId ? `<@&${cfg.vipProofRoleId}>` : '—',
+                            inline: true,
+                        },
+                        {
+                            name: 'PJ min / max',
+                            value: `${cfg.vipProofMinAttachments ?? 3} — ${cfg.vipProofMaxAttachments ?? 10}`,
+                            inline: true,
+                        },
+                        {
+                            name: 'Durée',
+                            value: `${cfg.vipProofDurationDays ?? 7} jour(s)`,
+                            inline: true,
+                        },
+                        {
+                            name: 'Couleur embed',
+                            value: `#${(Number(cfg.vipProofEmbedColor) || 0xf1c40f).toString(16).padStart(6, '0')}`,
+                            inline: true,
+                        },
+                        { name: 'Titre embed', value: (cfg.vipProofEmbedTitle || '—').slice(0, 256) },
+                        {
+                            name: 'Message (description)',
+                            value: (cfg.vipProofEmbedDescription || '—').slice(0, 900),
+                        }
+                    );
+                return interaction.reply({ embeds: [e], ephemeral: true });
+            }
+
+            if (sub === 'on') {
+                cfg.vipProofEnabled = true;
+                await cfg.save();
+                return interaction.reply({ content: 'Système VIP preuve **activé**.', ephemeral: true });
+            }
+
+            if (sub === 'off') {
+                cfg.vipProofEnabled = false;
+                await cfg.save();
+                return interaction.reply({ content: 'Système VIP preuve **désactivé**.', ephemeral: true });
+            }
+
+            if (sub === 'salon') {
+                const ch = interaction.options.getChannel('channel', true);
+                if (ch.type !== ChannelType.GuildText && ch.type !== ChannelType.GuildAnnouncement) {
+                    return interaction.reply({ content: 'Choisis un salon texte.', ephemeral: true });
+                }
+                cfg.vipProofChannelId = ch.id;
+                await cfg.save();
+                return interaction.reply({ content: `Salon preuve : ${ch}`, ephemeral: true });
+            }
+
+            if (sub === 'role') {
+                const role = interaction.options.getRole('role', true);
+                if (role.managed) {
+                    return interaction.reply({ content: 'Rôle d’intégration — impossible.', ephemeral: true });
+                }
+                cfg.vipProofRoleId = role.id;
+                await cfg.save();
+                return interaction.reply({
+                    content: `Rôle VIP : ${role}\nPlace le **rôle du bot** au-dessus + permission **Gérer les rôles**.`,
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'message') {
+                cfg.vipProofEmbedDescription = interaction.options.getString('texte', true).slice(0, 2000);
+                await cfg.save();
+                return interaction.reply({ content: 'Message de réponse enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'titre') {
+                cfg.vipProofEmbedTitle = interaction.options.getString('texte', true).slice(0, 256);
+                await cfg.save();
+                return interaction.reply({ content: 'Titre enregistré.', ephemeral: true });
+            }
+
+            if (sub === 'couleur') {
+                const hex = interaction.options.getString('hex', true);
+                cfg.vipProofEmbedColor = parseHexColor(hex);
+                await cfg.save();
+                return interaction.reply({ content: `Couleur : **#${hex.replace(/^#/, '')}**`, ephemeral: true });
+            }
+
+            if (sub === 'duree') {
+                cfg.vipProofDurationDays = interaction.options.getInteger('jours', true);
+                await cfg.save();
+                return interaction.reply({
+                    content: `Durée : **${cfg.vipProofDurationDays}** jour(s).`,
+                    ephemeral: true,
+                });
+            }
+
+            if (sub === 'min') {
+                const n = interaction.options.getInteger('nombre', true);
+                const currentMax = Number(cfg.vipProofMaxAttachments) || 10;
+                if (n > currentMax) {
+                    return interaction.reply({
+                        content: `Ton max est **${currentMax}**. Mets d’abord \`/setautorole max\` plus haut.`,
+                        ephemeral: true,
+                    });
+                }
+                cfg.vipProofMinAttachments = n;
+                await cfg.save();
+                return interaction.reply({ content: `Minimum PJ : **${n}**.`, ephemeral: true });
+            }
+
+            if (sub === 'max') {
+                const n = interaction.options.getInteger('nombre', true);
+                const currentMin = Number(cfg.vipProofMinAttachments) || 3;
+                if (n < currentMin) {
+                    return interaction.reply({
+                        content: `Ton min est **${currentMin}**. Mets d’abord \`/setautorole min\` plus bas.`,
+                        ephemeral: true,
+                    });
+                }
+                cfg.vipProofMaxAttachments = n;
+                await cfg.save();
+                return interaction.reply({ content: `Maximum PJ : **${n}**.`, ephemeral: true });
+            }
         }
 
         if (commandName === 'config') {
