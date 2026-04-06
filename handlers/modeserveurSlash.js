@@ -4,6 +4,7 @@ const {
     captureVitrineSnapshot,
     applyVitrineLock,
     restoreVitrineFromSnapshot,
+    forceUnlockAllChannels,
     botCanManageChannelPermissions,
     MAX_TARGET_ROLES,
 } = require('../lib/modeserveur');
@@ -102,7 +103,8 @@ async function runModeserveurSlash(interaction) {
             )
             .setDescription(
                 `**Rôles :** \`role_ajouter\` / \`role_retirer\` / \`roles_reset\` (max **${MAX_TARGET_ROLES}**).\n` +
-                    '**Ordre :** `sauvegarder` → `salon_public` → `activer`. Retour : `restaurer` / `desactiver`.'
+                    '**Urgence :** \`tout_debloquer\` — enlève les surcharges @everyone + rôles cibles sur tous les salons.\n' +
+                    '**Ordre normal :** `sauvegarder` → `salon_public` → `activer` · retour : `restaurer` / `desactiver`.'
             );
         await interaction.editReply({
             embeds: [e],
@@ -285,10 +287,34 @@ async function runModeserveurSlash(interaction) {
         return true;
     }
 
+    if (sub === 'tout_debloquer') {
+        try {
+            const n = await forceUnlockAllChannels(guild, doc.targetRoleIds || []);
+            doc.vitrineActive = false;
+            await doc.save();
+            const extra = (doc.targetRoleIds || []).length
+                ? ` + **${doc.targetRoleIds.length}** rôle(s) cible(s) (\`/modeserveur statut\`).`
+                : ' (seulement **@everyone** — ajoute des rôles avec \`role_ajouter\` si besoin).';
+            await interaction.editReply({
+                content:
+                    `**Déverrouillage forcé** : **${n}** opérations. Surcharges **@everyone** retirées sur les salons texte / vocaux / catégories / forum${extra}\n` +
+                    `Les salons suivent de nouveau l’**héritage** (catégorie + réglages du serveur). **Toute** surcharge @everyone par salon a été supprimée, pas seulement la vitrine.\n` +
+                    `Ensuite : refais un \`/modeserveur sauvegarder\` si tu comptes réutiliser la vitrine.`,
+            });
+        } catch (e) {
+            console.error('modeserveur tout_debloquer', e);
+            await interaction.editReply({
+                content: 'Erreur pendant le déverrouillage. Vérifie les logs du bot et la position du rôle du bot.',
+            });
+        }
+        return true;
+    }
+
     if (sub === 'restaurer' || sub === 'desactiver') {
         if (!doc.channels?.length) {
             await interaction.editReply({
-                content: 'Aucun instantané. Utilise **`/modeserveur sauvegarder`** en état normal.',
+                content:
+                    'Aucun instantané. Tu peux quand même forcer avec **`/modeserveur tout_debloquer`**, ou refaire **`/modeserveur sauvegarder`** quand le serveur est OK.',
             });
             return true;
         }

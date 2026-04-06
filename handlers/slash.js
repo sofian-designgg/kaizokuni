@@ -72,7 +72,7 @@ async function handleSlash(interaction) {
                     {
                         name: '🏷️ Vente / vitrine',
                         value:
-                            '`/modeserveur` — `role_ajouter` / `role_retirer` / `roles_reset` · `sauvegarder` · `salon_public` · `activer` · `restaurer`',
+                            '`/modeserveur` — `tout_debloquer` (urgence) · `sauvegarder` · `salon_public` · `activer` · `restaurer` · rôles cibles',
                     },
                     {
                         name: '👤 Profil VIP',
