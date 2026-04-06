@@ -1,11 +1,28 @@
 const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const {
     getOrCreateDoc,
-    captureEveryoneSnapshot,
+    captureVitrineSnapshot,
     applyVitrineLock,
-    restoreEveryoneFromSnapshot,
+    restoreVitrineFromSnapshot,
     botCanManageChannelPermissions,
+    MAX_TARGET_ROLES,
 } = require('../lib/modeserveur');
+
+function roleListMentions(ids) {
+    const arr = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    if (!arr.length) return '— (aucun — seulement **@everyone**)';
+    return arr.map((id) => `<@&${id}>`).join(', ').slice(0, 900);
+}
+
+async function blockIfVitrineActive(doc, interaction) {
+    if (!doc.vitrineActive) return false;
+    await interaction.reply({
+        content:
+            'Le mode vitrine est **actif**. Fais d’abord **`/modeserveur restaurer`** avant de modifier la liste des rôles.',
+        ephemeral: true,
+    });
+    return true;
+}
 
 /**
  * @returns {Promise<boolean>}
@@ -35,16 +52,28 @@ async function runModeserveurSlash(interaction) {
 
     const sub = interaction.options.getSubcommand();
     const doc = await getOrCreateDoc(guild.id);
+    const everyoneId = guild.id;
 
     if (sub === 'statut') {
         const e = new EmbedBuilder()
             .setTitle('Mode serveur — vitrine / vente')
             .setColor(doc.vitrineActive ? 0xed4245 : 0x57f287)
             .addFields(
-                { name: 'Mode vitrine', value: doc.vitrineActive ? '**ACTIF** (la plupart des salons sont masqués pour @everyone)' : 'Inactif', inline: false },
+                {
+                    name: 'Mode vitrine',
+                    value: doc.vitrineActive
+                        ? '**ACTIF** (salons masqués pour @everyone + rôles cibles)'
+                        : 'Inactif',
+                    inline: false,
+                },
+                {
+                    name: 'Rôles en plus de @everyone',
+                    value: roleListMentions(doc.targetRoleIds),
+                    inline: false,
+                },
                 {
                     name: 'Salon public',
-                    value: doc.publicChannelId ? `<#${doc.publicChannelId}>` : '— (non défini — `/modeserveur salon_public`)',
+                    value: doc.publicChannelId ? `<#${doc.publicChannelId}>` : '— (`/modeserveur salon_public`)',
                     inline: true,
                 },
                 {
@@ -59,9 +88,67 @@ async function runModeserveurSlash(interaction) {
                 }
             )
             .setDescription(
-                '**Ordre conseillé :** `sauvegarder` → `salon_public` → `activer`. Pour revenir : `restaurer` ou `desactiver`.'
+                `**Rôles :** \`role_ajouter\` / \`role_retirer\` / \`roles_reset\` (max **${MAX_TARGET_ROLES}**).\n` +
+                    '**Ordre :** `sauvegarder` → `salon_public` → `activer`. Retour : `restaurer` / `desactiver`.'
             );
-        await interaction.reply({ embeds: [e], ephemeral: true });
+        await interaction.reply({
+            embeds: [e],
+            ephemeral: true,
+            allowedMentions: { roles: doc.targetRoleIds || [] },
+        });
+        return true;
+    }
+
+    if (sub === 'role_ajouter') {
+        if (await blockIfVitrineActive(doc, interaction)) return true;
+        const role = interaction.options.getRole('role', true);
+        if (role.id === everyoneId) {
+            await interaction.reply({ content: '**@everyone** est déjà toujours inclus.', ephemeral: true });
+            return true;
+        }
+        const list = Array.isArray(doc.targetRoleIds) ? [...doc.targetRoleIds] : [];
+        if (list.includes(role.id)) {
+            await interaction.reply({ content: 'Ce rôle est **déjà** dans la liste.', ephemeral: true });
+            return true;
+        }
+        if (list.length >= MAX_TARGET_ROLES) {
+            await interaction.reply({
+                content: `Maximum **${MAX_TARGET_ROLES}** rôles. Retire-en avec \`role_retirer\` ou \`roles_reset\`.`,
+                ephemeral: true,
+            });
+            return true;
+        }
+        list.push(role.id);
+        doc.targetRoleIds = list;
+        await doc.save();
+        await interaction.reply({
+            content: `Rôle ajouté : ${role}\nInstantané : refais \`/modeserveur sauvegarder\` avant \`activer\` si tu avais déjà sauvegardé.`,
+            ephemeral: true,
+        });
+        return true;
+    }
+
+    if (sub === 'role_retirer') {
+        if (await blockIfVitrineActive(doc, interaction)) return true;
+        const role = interaction.options.getRole('role', true);
+        const list = (doc.targetRoleIds || []).filter((id) => id !== role.id);
+        doc.targetRoleIds = list;
+        await doc.save();
+        await interaction.reply({
+            content: `Rôle retiré : ${role}\nRefais \`/modeserveur sauvegarder\` avant la prochaine activation.`,
+            ephemeral: true,
+        });
+        return true;
+    }
+
+    if (sub === 'roles_reset') {
+        if (await blockIfVitrineActive(doc, interaction)) return true;
+        doc.targetRoleIds = [];
+        await doc.save();
+        await interaction.reply({
+            content: 'Liste des rôles **vidée** : seul **@everyone** sera concerné. Refais **`/modeserveur sauvegarder`**.',
+            ephemeral: true,
+        });
         return true;
     }
 
@@ -69,18 +156,22 @@ async function runModeserveurSlash(interaction) {
         if (doc.vitrineActive) {
             await interaction.reply({
                 content:
-                    'Le mode vitrine est **actif**. Fais d’abord **`/modeserveur restaurer`** avant une nouvelle sauvegarde (sinon tu enregistrerais l’état « tout masqué »).',
+                    'Le mode vitrine est **actif**. Fais d’abord **`/modeserveur restaurer`** avant une nouvelle sauvegarde.',
                 ephemeral: true,
             });
             return true;
         }
         await interaction.deferReply({ ephemeral: true });
-        const channels = await captureEveryoneSnapshot(guild);
+        const channels = await captureVitrineSnapshot(guild, doc.targetRoleIds || []);
         doc.channels = channels;
         doc.snapshotAt = new Date();
         await doc.save();
+        const extra = (doc.targetRoleIds || []).length;
         await interaction.editReply({
-            content: `Instantané enregistré : **${channels.length}** salon(s) / catégorie(s) (permissions **@everyone** uniquement). Tu peux définir le salon public puis \`/modeserveur activer\`.`,
+            content:
+                `Instantané : **${channels.length}** salon(s) — **@everyone**` +
+                (extra ? ` + **${extra}** rôle(s)` : '') +
+                `. Salon public puis \`/modeserveur activer\`.`,
         });
         return true;
     }
@@ -93,9 +184,13 @@ async function runModeserveurSlash(interaction) {
         }
         doc.publicChannelId = ch.id;
         await doc.save();
+        const extra = doc.targetRoleIds?.length
+            ? ` Même visibilité pour : ${roleListMentions(doc.targetRoleIds)}.`
+            : '';
         await interaction.reply({
-            content: `Salon visible pour **@everyone** en mode vitrine : ${ch}`,
+            content: `Salon public (visible en vitrine pour **@everyone**${doc.targetRoleIds?.length ? ' et les rôles cibles' : ''}) : ${ch}.${extra}`,
             ephemeral: true,
+            allowedMentions: { roles: doc.targetRoleIds || [] },
         });
         return true;
     }
@@ -103,7 +198,7 @@ async function runModeserveurSlash(interaction) {
     if (sub === 'activer') {
         if (!doc.publicChannelId) {
             await interaction.reply({
-                content: 'Définis d’abord le salon public : **`/modeserveur salon_public`**.',
+                content: 'Définis d’abord **`/modeserveur salon_public`**.',
                 ephemeral: true,
             });
             return true;
@@ -113,25 +208,33 @@ async function runModeserveurSlash(interaction) {
             (await guild.channels.fetch(doc.publicChannelId).catch(() => null));
         if (!pub?.isTextBased()) {
             await interaction.reply({
-                content: 'Le salon public enregistré est introuvable. Reconfigure avec **`/modeserveur salon_public`**.',
+                content: 'Salon public introuvable. Reconfigure **`/modeserveur salon_public`**.',
                 ephemeral: true,
             });
             return true;
         }
         if (!doc.channels?.length) {
             await interaction.reply({
-                content:
-                    'Aucun instantané. Fais d’abord **`/modeserveur sauvegarder`** pour pouvoir **restaurer** l’état actuel plus tard.',
+                content: 'Aucun instantané. Fais **`/modeserveur sauvegarder`** d’abord.',
                 ephemeral: true,
             });
             return true;
         }
         await interaction.deferReply({ ephemeral: true });
-        const n = await applyVitrineLock(guild, doc.publicChannelId, null);
+        const n = await applyVitrineLock(guild, doc.publicChannelId, doc.targetRoleIds || [], null);
         doc.vitrineActive = true;
         await doc.save();
+        const roleHint = (doc.targetRoleIds || []).length
+            ? ` Rôles cibles : ${roleListMentions(doc.targetRoleIds)}.`
+            : '';
         await interaction.editReply({
-            content: `Mode vitrine **activé**. **${n}** salon(s) traités. ${pub} reste visible pour **@everyone**. Les rôles et l’historique ne sont pas supprimés. Pour revenir : \`/modeserveur restaurer\`.`,
+            content:
+                `Vitrine **activée**. **${n}** mises à jour de permissions. ${pub} reste visible pour **@everyone**` +
+                ((doc.targetRoleIds || []).length ? ' et les **rôles cibles**' : '') +
+                `.` +
+                roleHint +
+                ` \`/modeserveur restaurer\` pour revenir en arrière.`,
+            allowedMentions: { roles: doc.targetRoleIds || [] },
         });
         return true;
     }
@@ -139,17 +242,17 @@ async function runModeserveurSlash(interaction) {
     if (sub === 'restaurer' || sub === 'desactiver') {
         if (!doc.channels?.length) {
             await interaction.reply({
-                content: 'Aucun instantané sauvegardé. Utilise **`/modeserveur sauvegarder`** quand le serveur est dans l’état normal.',
+                content: 'Aucun instantané. Utilise **`/modeserveur sauvegarder`** en état normal.',
                 ephemeral: true,
             });
             return true;
         }
         await interaction.deferReply({ ephemeral: true });
-        const n = await restoreEveryoneFromSnapshot(guild, doc.channels, () => {});
+        const n = await restoreVitrineFromSnapshot(guild, doc.channels, () => {});
         doc.vitrineActive = false;
         await doc.save();
         await interaction.editReply({
-            content: `Permissions **@everyone** restaurées depuis l’instantané (**${n}** salon(s) mis à jour). Mode vitrine **désactivé**.`,
+            content: `Permissions restaurées depuis l’instantané (**${n}** mises à jour : @everyone + rôles sauvegardés). Vitrine **désactivée**.`,
         });
         return true;
     }
