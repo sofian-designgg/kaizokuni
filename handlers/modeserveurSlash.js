@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, ChannelType, MessageFlags } = require('discord.js');
 const {
     getOrCreateDoc,
     captureVitrineSnapshot,
@@ -31,12 +31,12 @@ async function runModeserveurSlash(interaction) {
 
     const { guild, member } = interaction;
     if (!guild || !member) {
-        await interaction.reply({ content: 'Utilisable seulement sur un serveur.', ephemeral: true });
+        await interaction.reply({ content: 'Utilisable seulement sur un serveur.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
     if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: 'Réservé aux **administrateurs**.', ephemeral: true });
+        await interaction.reply({ content: 'Réservé aux **administrateurs**.', flags: MessageFlags.Ephemeral });
         return true;
     }
 
@@ -44,13 +44,13 @@ async function runModeserveurSlash(interaction) {
         await interaction.reply({
             content:
                 'J’ai besoin de la permission **Gérer les salons** (et mon rôle doit être **au-dessus** des rôles cibles quand Discord l’exige).',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
         return true;
     }
 
     /** Répondre tout de suite : la suite peut prendre du temps (Mongo, etc.) — évite le timeout 3 s de Discord */
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const sub = interaction.options.getSubcommand();
     let doc;
