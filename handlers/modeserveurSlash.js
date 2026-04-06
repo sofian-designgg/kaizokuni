@@ -293,11 +293,13 @@ async function runModeserveurSlash(interaction) {
             return true;
         }
         try {
-            const n = await restoreVitrineFromSnapshot(guild, doc.channels, () => {});
+            const n = await restoreVitrineFromSnapshot(guild, doc.channels, doc.targetRoleIds || [], () => {});
             doc.vitrineActive = false;
             await doc.save();
             await interaction.editReply({
-                content: `Permissions restaurées depuis l’instantané (**${n}** mises à jour : @everyone + rôles sauvegardés). Vitrine **désactivée**.`,
+                content:
+                    `Permissions restaurées (**${n}** opérations) : instantané, salons hors sauvegarde, et rôles cibles sans ligne dans une vieille sauvegarde. Vitrine **désactivée**.\n` +
+                    `Si ça bloque encore : remonte le **rôle du bot** au-dessus des rôles concernés puis refais **\`/modeserveur restaurer\`**.`,
             });
         } catch (e) {
             console.error('modeserveur restaurer', e);
