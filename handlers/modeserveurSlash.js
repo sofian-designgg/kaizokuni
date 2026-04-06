@@ -103,7 +103,7 @@ async function runModeserveurSlash(interaction) {
             )
             .setDescription(
                 `**Rôles :** \`role_ajouter\` / \`role_retirer\` / \`roles_reset\` (max **${MAX_TARGET_ROLES}**).\n` +
-                    '**Urgence :** \`tout_debloquer\` — enlève les surcharges @everyone + rôles cibles sur tous les salons.\n' +
+                    '**Urgence :** \`tout_debloquer\` — remet **Voir le salon** en héritage (@everyone + rôles cibles), sans toucher au reste.\n' +
                     '**Ordre normal :** `sauvegarder` → `salon_public` → `activer` · retour : `restaurer` / `desactiver`.'
             );
         await interaction.editReply({
@@ -297,9 +297,9 @@ async function runModeserveurSlash(interaction) {
                 : ' (seulement **@everyone** — ajoute des rôles avec \`role_ajouter\` si besoin).';
             await interaction.editReply({
                 content:
-                    `**Déverrouillage forcé** : **${n}** opérations. Surcharges **@everyone** retirées sur les salons texte / vocaux / catégories / forum${extra}\n` +
-                    `Les salons suivent de nouveau l’**héritage** (catégorie + réglages du serveur). **Toute** surcharge @everyone par salon a été supprimée, pas seulement la vitrine.\n` +
-                    `Ensuite : refais un \`/modeserveur sauvegarder\` si tu comptes réutiliser la vitrine.`,
+                    `**Déverrouillage (vue uniquement)** : **${n}** réglages appliqués sur texte / vocaux / catégories / forum${extra}\n` +
+                    `Pour **@everyone** et les rôles cibles : seul **Voir le salon** repasse en **héritage** (comme si la vitrine n’avait pas bloqué la vue). Les **autres** permissions sur la même ligne (écrire, fichiers, etc.) sont **conservées**.\n` +
+                    `Pour retrouver l’état **exact** d’avant vitrine, utilise plutôt \`/modeserveur restaurer\` si tu as un instantané. Ensuite : \`/modeserveur sauvegarder\` si tu réutilises la vitrine.`,
             });
         } catch (e) {
             console.error('modeserveur tout_debloquer', e);
