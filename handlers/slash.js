@@ -16,6 +16,7 @@ const { normalizeWord, MAX_WORDS } = require('../lib/autmsg');
 const axios = require('axios');
 const { runTicketSlash } = require('./ticketSlash');
 const { runProfileSlash } = require('./profileSlash');
+const { runModeserveurSlash } = require('./modeserveurSlash');
 
 function parseHexColor(raw) {
     if (!raw) return 0x5865f2;
@@ -35,6 +36,7 @@ async function handleSlash(interaction) {
     try {
         if (await runTicketSlash(interaction)) return;
         if (await runProfileSlash(interaction, cfg)) return;
+        if (await runModeserveurSlash(interaction)) return;
 
         if (commandName === 'help') {
             const e = new EmbedBuilder()
@@ -66,6 +68,10 @@ async function handleSlash(interaction) {
                     {
                         name: '🎫 Tickets',
                         value: '`/setticket` (view, on, catégorie, staff, panel_*, accueil_*, …) · `/ticketpanel`',
+                    },
+                    {
+                        name: '🏷️ Vente / vitrine',
+                        value: '`/modeserveur` — `sauvegarder` · `salon_public` · `activer` · `restaurer` / `desactiver` · `statut`',
                     },
                     {
                         name: '👤 Profil VIP',
